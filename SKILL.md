@@ -20,17 +20,7 @@ Core principles:
 
 ## Prerequisites
 
-Check what is available before starting. If something is missing, degrade gracefully (see Failure Handling) instead of stopping.
-
-| Requirement | Why | If missing |
-|---|---|---|
-| Python 3.7+ | preview/validation scripts | author XML by hand; skip script-based checks and say so |
-| System Edge/Chrome (any recent build) | agent screenshots via `scripts/render_png.py` (headless; no browser panel or MCP tooling needed) | degraded mode: static pre-flight + ask the user to review the rendered preview once |
-| Vision / image reading (for reference images) | style extraction, fidelity comparison | ask the user for palette hex codes; state that pixel-level fidelity cannot be verified |
-| Internet access | preview/screenshot pages load `https://viewer.diagrams.net/` and `https://embed.diagrams.net/` | XML authoring still works; preview/screenshot unavailable |
-| File write access | creating `.drawio` files | — |
-
-Script paths are relative to the skill directory. **Run `preflight.py` lazily** — execute it only before the first use of a Python script. If no script is needed (simple diagram, fast path), preflight never runs.
+The skill writes `.drawio` files — plain XML. No runtime dependencies, no browser, no network, no Python. All validation scripts are optional tools, not gates.
 
 ## Step 0 — Task Intake
 
@@ -72,15 +62,6 @@ This table is the single source of truth for which gates apply at each level. Re
 4. **Iterate on feedback** — user says what to change → edit XML → hand off again. Quick check and preview are available on demand if the user asks for verification.
 5. **Finalization (only when the user says "finalize")** — run the full pre-flight, compile a prioritized issue list, present it to the user, fix what they choose, and hand off the final `.drawio`.
 
-## Screenshot Standard
-
-Applies whenever a screenshot is used as review evidence:
-
-- Canvas-only crop; the diagram must occupy ≥80% of the image. A full browser window is invalid evidence.
-- `scripts/render_png.py` output is canvas-only by construction (no browser chrome) and auto-fits the diagram — prefer it as the agent-side review screenshot; `--width/--height` force a fixed viewport when needed.
-- Cache-bust with `?rev=N`; wait for the iframe to render (3–5 s).
-- If cropping is unavailable: resize the viewport to 1920×1400+, zoom out until the full canvas fits, then screenshot. If text is unreadable in the result, the screenshot is invalid.
-
 ## Exit Checklists (finalization only)
 
 These apply when the user finalizes, not during the draft phase.
@@ -91,36 +72,24 @@ These apply when the user finalizes, not during the draft phase.
 
 **Final gate in all cases:** every finding from the finalization pass is presented with its priority, and the user has acknowledged the disposition of each item (fix or consciously skip). Skipped items move to the gap list.
 
-## Failure Handling And Degradation
+## Failure Handling
 
-- **Twice-failed fix** — stop retrying; report the defect, what was tried, the suspected cause (rendering difference, tool limit), and the options.
-- **Unavoidable renderer differences** — record them in the gap list; do not loop on them.
-- **Windows long URLs** — never open large diagrams via `.url` shortcuts or `#create=` URLs; use the local preview helpers (short URL via postMessage).
-- **No screenshot channel** — never build a bespoke rendering pipeline. Run `preflight.py`; if the screenshot channel is unavailable, switch to degraded mode (static pre-flight + hand the preview URL to the user) and state exactly what was not verified.
-- **Stale preview** — the preview HTML embeds the XML at generation time; regenerate after every XML edit and bump `?rev=N`.
-- **Saving from preview** — the blue Save button downloads a `.drawio`; move it back into the working path before further edits.
-- **Text overlap or overflow** — split cells, reduce font size, widen containers; verify by screenshot.
+- **Twice-failed fix** — stop retrying; report the defect, what was tried, the suspected cause, and the options.
 - **Ugly loop arrows** — use editable curved connectors, not Unicode glyphs.
 - **Missing icons** — check `assets/icons/ICON-MANIFEST.md` and `references/primitive-icons.md` before downloading anything.
-- **User says stop** — stop immediately; hand off the current state + gap list.
+- **User says stop** — stop immediately; hand off the current state.
 
 ## Bundled Helpers
 
-- `VERSION` — installed skill version (this is a locally customized build; see `CHANGELOG.md`).
-- `scripts/validate_visual_quality.py` — static pre-render checking (arrow–box collisions, text overflow risk, spacing, palette, decorations, density). Supports `--quick` (draft phase: display-blocking rules only), `--waive <rule>` to downgrade specific FAIL rules to non-blocking WAIVED findings (the reason still needs to be logged), `--json`, `--strict`, `--rules`.
-- `scripts/validate_drawio.py` — structural validation before handoff; supports `--strict` and `--json` for CI.
-- `scripts/validate_replication_artifacts.py <workdir> --level L2|L3 [--require-screenshot-review]` — artifact completeness by level. L1 requires no intermediate files.
-- `scripts/serve_drawio_preview.py` / `scripts/make_drawio_preview.py` — local short-URL preview that loads the XML into diagrams.net via `postMessage`.
-- `scripts/render_png.py` — headless canvas-only PNG render (system Edge/Chrome; auto-fit viewport; `--width/--height`/`--scale`/`--budget`/`--browser` overrides).
-- `scripts/preflight.py` — one-shot environment report (Python, script set, headless browser, network, optional draw.io desktop) plus the working mode; run once per session.
-- `scripts/check_skill_update.py` — compares the local VERSION with the upstream repository. This is a locally customized build: reinstalling from upstream overwrites local changes.
-- Reference files: `references/drawio-workflow.md` (end-to-end workflow), `references/self-supervision-and-intake.md` (intake, review zones, exit discipline), `references/xml-preflight.md` (pre-flight rules), `references/style-extraction.md` (style capture), `references/topconf-paper-style.md` (paper-figure style), `references/primitive-icons.md` (editable icon recipes), `references/reference-replication-protocol.md` (replication protocol), `references/xml-authoring.md` (XML patterns).
-- Assets: `assets/icons/ICON-MANIFEST.md` (bundled MIT Tabler SVGs), `assets/reference-images/REFERENCE-IMAGES.md` (style fallback images).
+- `VERSION` — installed skill version (see `CHANGELOG.md`).
+- `scripts/validate_visual_quality.py` — static pre-render checking (arrow–box collisions, text overflow risk, spacing, palette, decorations, density). Supports `--quick`, `--json`, `--strict`.
+- `scripts/validate_drawio.py` — structural validation; supports `--strict` and `--json`.
+- Reference files: `references/drawio-workflow.md`, `references/self-supervision-and-intake.md`, `references/primitive-icons.md`, `references/xml-authoring.md`.
+- Assets: `assets/icons/ICON-MANIFEST.md` (bundled MIT Tabler SVGs).
 
 ## Editing Rules
 
 - Edit `.drawio` files by writing or patching XML directly. Keep a working copy and a handoff copy only when useful.
 - Preserve user files and unrelated generated files.
-- Never claim completion without visual verification when a screenshot loop was possible. In degraded mode, state exactly what was and was not verified.
-- When the user reports a defect: fix it, show the focused crop plus the full canvas, and append to the defect log. Do not re-run full audits unless the user asks.
-- For "100% reproduction", treat it as a bounded target: keep fixing visible mismatches until the budget is spent or the user accepts. Report remaining mismatches honestly — never claim perfection.
+- When the user reports a defect: fix it and re-deliver. Do not re-run full audits unless the user asks.
+- For "100% reproduction", treat it as a bounded target: keep fixing visible mismatches until the user accepts. Report remaining mismatches honestly — never claim perfection.
