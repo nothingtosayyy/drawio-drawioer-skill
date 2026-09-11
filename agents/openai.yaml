@@ -1,4 +1,0 @@
-interface:
-  display_name: "Research Draw.io Diagram Builder"
-  short_description: "Build editable research draw.io figures with budgeted screenshot review"
-  default_prompt: "Use $drawio-diagram-builder to create an editable research-style draw.io diagram from my requirements. Start by asking for the fidelity level (L1/L2/L3) and the iteration budget, then plan, pre-flight, preview locally, screenshot, review, and iterate within that budget."
