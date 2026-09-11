@@ -71,7 +71,7 @@ This table is the single source of truth for which gates apply at each level. Re
 |---|---|---|---|
 | Intermediate docs | none | optional (visual-spec, defect-log) | full set: visual-spec, layout-grid, asset-ledger, defect-log |
 | Draft phase (same for all levels) | quick check only (`--quick`): overlap, arrow-through-box, severe text overflow. Small defects wait for finalization. Draft is revealed as soon as the quick check is clean; draft-phase iteration follows user feedback with quick checks only. |
-| Finalization check | full pre-flight + prioritized issue list | full pre-flight + screenshot review + issue list | full pre-flight + screenshot review + one red-team pass + issue list |
+| Finalization check | full pre-flight + prioritized issue list | full pre-flight + issue list | full pre-flight + one red-team pass + issue list |
 | Issue handling | the user chooses what to fix from the issue list; skipped items move to the gap list |
 | Finding quotas | none | none | none |
 | Budget | caps full-review cycles (draft-phase quick fixes do not consume it) |
@@ -88,7 +88,7 @@ This table is the single source of truth for which gates apply at each level. Re
    - If the user provided style references, extract the style first (`references/style-extraction.md`): compact table for L2, full table for L3.
 3. **Author XML** (`references/xml-authoring.md`): explicit geometry, editable primitives, icons from `references/primitive-icons.md` or the bundled assets in `assets/icons/`.
 4. **Quick check (draft phase)** — run `python <skill-dir>/scripts/validate_visual_quality.py <file>.drawio --quick`. It checks only display-blocking defects (overlap, arrow-through-box, severe text overflow). Fix those; everything else waits for finalization.
-5. **Preview** — `python <skill-dir>/scripts/serve_drawio_preview.py <file>.drawio --port 8765` (or `make_drawio_preview.py` + `python -m http.server`). Open `http://127.0.0.1:8765/drawio-preview.html?rev=N` and wait 3–5 s for the embed. For your own review, take a canvas-only screenshot with `python <skill-dir>/scripts/render_png.py <file>.drawio` (headless Edge/Chrome, viewport auto-fits the diagram) and regenerate it after every XML edit.
+5. **Preview** — `python <skill-dir>/scripts/serve_drawio_preview.py <file>.drawio --port 8765` (or `make_drawio_preview.py` + `python -m http.server`). Open `http://127.0.0.1:8765/drawio-preview.html?rev=N` and wait 3–5 s for the embed. Optionally take a screenshot with `python <skill-dir>/scripts/render_png.py <file>.drawio` for your own review; this is not a deliverable requirement.
 6. **Draft handoff (draft-first strategy — the default).** As soon as the quick check is clean, hand the draft to the user right away: `.drawio` path + preview URL + **the available next actions spelled out explicitly in the user's language** — e.g. "draft 1 is ready. You can: (a) send feedback and I'll adjust; (b) say 'finalize / run the final check' and I'll run the full pass, then give you a prioritized issue list to pick fixes from; (c) say nothing and I'll keep refining." Never assume the user knows the 'finalize' command exists — always announce it. Do NOT run the full pre-flight or the review cycle before this reveal. Under polish-first, skip this step and reveal only at finalization.
 7. **Draft-phase iteration** — apply user feedback as light changes; after each change re-run only the quick check. No full reviews during the draft phase.
 8. **Finalization (when the user is ready to finalize or asks for a final pass)**:
@@ -99,7 +99,7 @@ This table is the single source of truth for which gates apply at each level. Re
    - Exit checklist satisfied and the user has acknowledged the issue list → final handoff, even right after the first full pass.
    - Budget spent → final handoff of the current best + gap list, clearly labeled.
    - The user may stop or redirect at any time; in Interactive mode, report progress before starting another full cycle, again stating the concrete options (continue / adjust / finalize).
-10. **Final handoff** — `.drawio` path + latest screenshot + (replication/style tasks) a side-by-side reference-vs-result image + the final issue list (fixed + consciously skipped) + gap list + a one-line summary of what changed since the draft. The self-score card is optional and never blocks handoff.
+10. **Final handoff** — `.drawio` path + the final issue list (fixed + consciously skipped) + gap list + a one-line summary of what changed since the draft. The self-score card is optional and never blocks handoff.
 
 ## Screenshot Standard
 
