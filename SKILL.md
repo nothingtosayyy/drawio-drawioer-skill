@@ -7,16 +7,16 @@ description: Create, edit, replicate, and iteratively refine editable diagrams i
 
 ## Overview
 
-Turn prompts, papers, repositories, and reference images into editable `.drawio` diagrams. The workflow is sized to the task: ask for a fidelity level and an iteration budget up front, run the smallest process that reaches the target, and stop when the target is met or the budget is spent.
+Turn prompts, papers, repositories, and reference images into editable `.drawio` diagrams. The workflow starts with the fastest path that can produce a useful first result, then refines on demand.
 
 Core principles:
 
 1. **Editable output first.** The `.drawio` file is the primary artifact. Never present an embedded screenshot as the final answer when the user asked for an editable or vector result.
 2. **Fit the process to the task.** A 15-box flowchart does not need the ceremony of a pixel-faithful conference-figure replica. The fidelity level decides which gates apply.
-3. **Deliver early, then refine.** Most users want to see something quickly and react to it, not wait out a long black box. Under the default draft-first strategy, the first version whose quick check is clean is revealed to the user immediately (file + preview link); refinement continues afterward. Never bury the first reveal behind the full review cycle. Long stretches of invisible work are the original failure mode this skill exists to avoid.
-4. **Check lightly in draft, fully at finalization.** Until the user finalizes, run only the quick check (display-blocking defects: overlap, arrow-through-box, severe text overflow) and ignore small imperfections — a draft exists to be reacted to, not audited. When the user is ready to finalize (or asks for a final pass), run the full check, compile every finding into a prioritized issue list (P0/P1/P2), and let the user choose what to fix. Never dump full technical findings on an unfinished draft; never skip the full pass at finalization.
-5. **The user holds the controls — and must know what they can say.** Ask about fidelity, budget, and delivery strategy at intake; report progress after each cycle; hand off at the target or when the budget runs out. **Never assume the user knows the available commands: at every contact point (draft handoff, progress reports, final handoff), spell out the concrete next actions in the user's language** — e.g. "send feedback / say 'finalize' to run the full check and get the issue list / say nothing and I'll keep refining". The user may stop the loop or redirect at any time.
-6. **Objective checks over self-declared quality.** Prefer the static pre-flight checker, rendered screenshots, and side-by-side comparison with the reference. Fix by severity (P0/P1), never by finding counts.
+3. **Deliver before checking.** The first visible result must reach the user as fast as possible — no script-based checks block the draft. XML is written, file is handed over; refinement and validation happen after the first look, not before.
+4. **Zero external tools in the fast path.** For a simple diagram, the entire pipeline is: write XML → hand over. Python scripts, preview servers, and browser screenshots are optional tools scoped to specific needs, not gates for every diagram.
+5. **The user signals "done."** The finalization pass (full pre-flight + issue list) runs only when the user says "finalize" — never as a mandatory post-draft step. The draft exists to be reacted to, not audited.
+6. **Checks serve the user, not the process.** Quick check, preview, and screenshot are available on demand. Their absence must never block delivery.
 
 ## Prerequisites
 
@@ -30,38 +30,24 @@ Check what is available before starting. If something is missing, degrade gracef
 | Internet access | preview/screenshot pages load `https://viewer.diagrams.net/` and `https://embed.diagrams.net/` | XML authoring still works; preview/screenshot unavailable |
 | File write access | creating `.drawio` files | — |
 
-Script paths are relative to the skill directory. **Run `python <skill-dir>/scripts/preflight.py` once per session** — it reports every capability above and prints the mode (FULL / DEGRADED); do not re-probe the environment per diagram. Never depend on an in-app browser panel for screenshots (it may be hidden); the CLI renderer is the default channel.
+Script paths are relative to the skill directory. **Run `preflight.py` lazily** — execute it only before the first use of a Python script. If no script is needed (simple diagram, fast path), preflight never runs.
 
 ## Step 0 — Task Intake
 
-Ask once, in one batch. Do not drip questions.
+**Minimal intake rule: the simplest path has zero questions.** Infer the level from the request and proceed. Only ask when the request is ambiguous or explicitly about replication.
 
-**How to ask (phrasing rules):**
+**Fast path (no questions, no ceremony):**
+- Freeform diagram (flowchart, architecture, process) — silently assume L1 structure-only, `.drawio` only. State the plan in one sentence and write XML immediately.
+- "Draw a simple X" — same fast path.
+- "Like this" / provides a drawn reference → this is replication; **ask once** about fidelity.
 
-- Ask in the user's language with **outcome-first wording**: describe what the user will get and what it costs — never lead with internal codes or jargon (`L1/L2/L3`, `draft-first` / `polish-first`, cycle budgets, ports, pre-flight, finalization). E.g. fidelity → "只要内容和结构正确（最快）／布局、配色贴近原图（推荐）／尽量一模一样（最费时）"; strategy → "先给我看初稿（推荐：第一版通过基础检查就先给你看，再一起改）／全部做完再给我看".
-- **State the cost with each option** — rough rounds or time ("最快，通常 1 轮" / "标准，默认 2 轮" / "最细，3 轮起").
-- **Make the delegation shortcut visible**: tell the user they can reply "use your defaults"（如"按推荐来"）to accept all recommended options — never assume they know this is allowed.
+**Replication intake** (one question only):
 
-1. **Fidelity level**
-   - L1 Structure — content, labels, and semantics correct; layout may differ
-   - L2 Layout — approximate placement, palette, and typography match the reference
-   - L3 Pixel — maximum-fidelity replication
-2. **Iteration budget** — default by level: L1 = 1 cycle, L2 = 2, L3 = 3. The user may set a different cap. "Keep going until it's perfect" is not a number — cap it at the level default and say so.
-3. **Deliverables** — `.drawio` only / + PNG export / + both
-4. **Delivery strategy** — draft-first (recommended default) or polish-first:
-   - Draft-first: the moment the first version passes pre-flight, you get the file and a preview link; refinement continues after your first look. Best for avoiding a long black box.
-   - Polish-first: nothing is revealed until the exit checklist passes or the budget ends.
+> 你想要什么精细度？(1) 结构和内容正确，最快出图 —— (2) 布局和配色贴近，推荐 —— (3) 尽量一模一样，最费时
 
-**Blocking gate: for replication, style-matching, or any diagram derived from a reference image, do not author anything until the user has answered — or explicitly delegated the choice ("you decide" / "up to you"). Proposing a default level and "confirming" it yourself is still not an answer: the ask must go to the user and the reply must come from the user. The user's first message rarely contains the level; the default action on "replicate this" is to ASK, not to draw. A test run, an automated pipeline, or your own judgment never removes this gate.**
+Answer 1→L1, 2→L2, 3→L3. No answer → L2 default.
 
-Request-specific rules:
-
-- "redraw / replicate / reproduce" without a level → **ask the user**, proposing L2 as the recommended default. Never silently assume L2 or L3.
-- "exact / 100% / pixel-perfect" → level is L3; still **ask** for the budget.
-- Freeform diagram with no reference image → L1 is a safe default; state the plan in one sentence and proceed unless the user objects.
-- User delegates ("you decide") → record the choice as user-delegated, apply the level defaults, and say what you chose.
-
-Also record without asking: output path, canvas size, caption policy, label language.
+**For any task:** do not ask about deliverables (`.drawio` vs PNG), delivery strategy (draft vs polish), or iteration budget. Default to `.drawio` only, deliver immediately after first XML, and let the user signal when they want the full pass.
 
 ## Fidelity Levels — Gate Matrix
 
@@ -70,36 +56,21 @@ This table is the single source of truth for which gates apply at each level. Re
 | Stage | L1 Structure | L2 Layout | L3 Pixel |
 |---|---|---|---|
 | Intermediate docs | none | optional (visual-spec, defect-log) | full set: visual-spec, layout-grid, asset-ledger, defect-log |
-| Draft phase (same for all levels) | quick check only (`--quick`): overlap, arrow-through-box, severe text overflow. Small defects wait for finalization. Draft is revealed as soon as the quick check is clean; draft-phase iteration follows user feedback with quick checks only. |
+| Draft phase (same for all levels) | no blocking gates. XML is written → hand off to user. Quick check (`--quick`) is available on demand but never blocks delivery. Small defects wait for finalization. |
 | Finalization check | full pre-flight + prioritized issue list | full pre-flight + issue list | full pre-flight + one red-team pass + issue list |
 | Issue handling | the user chooses what to fix from the issue list; skipped items move to the gap list |
 | Finding quotas | none | none | none |
-| Budget | caps full-review cycles (draft-phase quick fixes do not consume it) |
 | Exit gate | the user has acknowledged the issue list (fix or skip per item) |
-
-"Up to N cycles" means the loop stops as soon as the exit checklist passes, even after one cycle. It also stops when the budget is spent: hand off the current best plus a gap list. There is no minimum number of cycles and no minimum number of findings. Never invent defects to justify more iterations, and never keep iterating on a diagram that already passes its checklist.
 
 ## Standard Workflow
 
-1. **Intake** (Step 0). For replication tasks, also load `references/reference-replication-protocol.md`.
-   - **Preflight (once per session)** — `python <skill-dir>/scripts/preflight.py`; keep its reported mode (FULL / DEGRADED) for the rest of the session instead of re-probing the environment per diagram.
-2. **Plan** — depth by level (see `references/self-supervision-and-intake.md`):
-   - Define every connector's meaning before drawing it (source, target, direction, fan-in/out, feedback).
-   - If the user provided style references, extract the style first (`references/style-extraction.md`): compact table for L2, full table for L3.
-3. **Author XML** (`references/xml-authoring.md`): explicit geometry, editable primitives, icons from `references/primitive-icons.md` or the bundled assets in `assets/icons/`.
-4. **Quick check (draft phase)** — run `python <skill-dir>/scripts/validate_visual_quality.py <file>.drawio --quick`. It checks only display-blocking defects (overlap, arrow-through-box, severe text overflow). Fix those; everything else waits for finalization.
-5. **Preview** — `python <skill-dir>/scripts/serve_drawio_preview.py <file>.drawio --port 8765` (or `make_drawio_preview.py` + `python -m http.server`). Open `http://127.0.0.1:8765/drawio-preview.html?rev=N` and wait 3–5 s for the embed. Optionally take a screenshot with `python <skill-dir>/scripts/render_png.py <file>.drawio` for your own review; this is not a deliverable requirement.
-6. **Draft handoff (draft-first strategy — the default).** As soon as the quick check is clean, hand the draft to the user right away: `.drawio` path + preview URL + **the available next actions spelled out explicitly in the user's language** — e.g. "draft 1 is ready. You can: (a) send feedback and I'll adjust; (b) say 'finalize / run the final check' and I'll run the full pass, then give you a prioritized issue list to pick fixes from; (c) say nothing and I'll keep refining." Never assume the user knows the 'finalize' command exists — always announce it. Do NOT run the full pre-flight or the review cycle before this reveal. Under polish-first, skip this step and reveal only at finalization.
-7. **Draft-phase iteration** — apply user feedback as light changes; after each change re-run only the quick check. No full reviews during the draft phase.
-8. **Finalization (when the user is ready to finalize or asks for a final pass)**:
-   - Run the full pre-flight plus the level's finalization checks (screenshot review; L3 also one red-team pass).
-   - Compile EVERY finding into a prioritized issue list (P0/P1/P2) and give it to the user to choose what to fix.
-   - Fix the selected items, re-verify, and repeat until the user accepts or the budget is spent.
-9. **Converge or stop**:
-   - Exit checklist satisfied and the user has acknowledged the issue list → final handoff, even right after the first full pass.
-   - Budget spent → final handoff of the current best + gap list, clearly labeled.
-   - The user may stop or redirect at any time; in Interactive mode, report progress before starting another full cycle, again stating the concrete options (continue / adjust / finalize).
-10. **Final handoff** — `.drawio` path + the final issue list (fixed + consciously skipped) + gap list + a one-line summary of what changed since the draft. The self-score card is optional and never blocks handoff.
+1. **Assess** — classify the request: is it a freeform diagram (fast path) or replication/style-matching?
+   - Fast path: skip to step 3. No intake, no preflight, no plan docs.
+   - Replication: Step 0 one-question intake first.
+2. **Author XML** — write mxGraph XML into a `.drawio` file. Simple geometry, editable primitives, icons from `assets/icons/tabler/outline/`.
+3. **Hand off (no ceremony).** Tell the user the file path in one sentence. Do not spell out options — let the user react naturally.
+4. **Iterate on feedback** — user says what to change → edit XML → hand off again. Quick check and preview are available on demand if the user asks for verification.
+5. **Finalization (only when the user says "finalize")** — run the full pre-flight, compile a prioritized issue list, present it to the user, fix what they choose, and hand off the final `.drawio`.
 
 ## Screenshot Standard
 
